@@ -108,13 +108,13 @@ func cloneRepo(url, dst string) error {
 	return cmd.Run()
 }
 
-func handleSource(source string) (string, error) {
+func handleSource(source string) (string, string, error) {
 	serviceID := generateServiceID(source)
 	buildDir := filepath.Join(os.Getenv("HOME"), ".mesh", "builds", serviceID)
 
 	// Ensure build directory exists
 	if err := os.MkdirAll(buildDir, 0755); err != nil {
-		return "", err
+		return "","", err
 	}
 
 	// Check if local folder
@@ -123,19 +123,19 @@ func handleSource(source string) (string, error) {
 		// Copy local folder
 		err = copyFolder(source, buildDir)
 		if err != nil {
-			return "", err
+			return "","", err
 		}
 		fmt.Println("✔ Local folder copied to build directory:", buildDir)
 	} else {
 		// Assume Git repo
 		err = cloneRepo(source, buildDir)
 		if err != nil {
-			return "", err
+			return "","", err
 		}
 		fmt.Println("✔ Repo cloned to build directory:", buildDir)
 	}
 
-	return buildDir, nil
+	return buildDir,serviceID, nil
 }
 
 
@@ -189,13 +189,14 @@ func publishFlow(scanner *bufio.Scanner) {
 
 	fmt.Println("- Source validation")
 
-	buildPath, err := handleSource(path)
+	buildPath,serviceID ,err := handleSource(path)
 	if err != nil {
 		fmt.Println("❌ Error handling source:", err)
 		return
 	}
 
 	fmt.Println("Build directory ready at:", buildPath)
+    fmt.Println("Service ID generated:", serviceID)
 
 	
 	fmt.Println("- Build job creation")
@@ -207,7 +208,12 @@ func publishFlow(scanner *bufio.Scanner) {
 		fmt.Println("✔ Docker is installed, ready to build containers")
 		fmt.Println("Building Docker image...")
 
+		
+
+
 	fmt.Println("- Containerization")
+	detect_runtime(buildPath, serviceID,port)
+
 }
 
 

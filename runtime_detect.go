@@ -295,8 +295,8 @@ func runContainerCLI(image, hostPort, containerPort string) error {
 }
 
 
-func main() {
-	projectPath := "/home/scriptgad/Documents/app1" // replace with real build path
+func detect_runtime(pathway string, serviceID string,port int) {
+	projectPath := pathway // replace with real build path
 
 	fmt.Println("🔍 Detecting project runtime...")
 
@@ -325,7 +325,7 @@ func main() {
 	// docker build
 	fmt.Println("🛠  Build image...")
 
-	buildResult := buildDockerImage(projectPath, "0c1b2c3d4e6f") // replace with real service ID
+	buildResult := buildDockerImage(projectPath, serviceID) // replace with real service ID
 
 	if !buildResult.Success {
 		fmt.Println("❌ Image build failed:", buildResult.Error)
@@ -385,7 +385,9 @@ func main() {
 		fmt.Println("🚀 Starting  container locally")
 		time.Sleep(5 * time.Second) // Simulate startup delay
 
-		if err := runContainerCLI(buildResult.ImageID, "8080", "8080"); err != nil {
+		portStr := fmt.Sprintf("%d", port)
+
+		if err := runContainerCLI(buildResult.ImageID, portStr, portStr); err != nil {
 			fmt.Println(err)
 		} 
 
@@ -396,9 +398,6 @@ func main() {
 		fmt.Println("❌ System cannot host the container locally:", result.Reason)
 		fmt.Println("Host: Seed")
 	}
-
-
-
 	
 
 }
