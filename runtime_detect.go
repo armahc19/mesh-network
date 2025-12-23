@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"runtime"
 	"syscall"
+	"os/exec"
 	
 
 	
@@ -277,10 +278,25 @@ func checkResources(buildPath string, imageSize uint64) (*ResourceCheckResult, e
 	}, nil
 }
 
+// running docker container build
+func runContainerCLI(image, hostPort, containerPort string) error {
+	cmd := exec.Command(
+		"docker", "run", "-d",
+		"-p", hostPort+":"+containerPort,
+		image,
+	)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("docker run failed: %v, output: %s", err, string(output))
+	}
+
+	fmt.Println("✔ Container started locally, ID:", string(output))
+	return nil
+}
 
 
 func main() {
-	projectPath := "/home/scriptgad/Documents/app2" // replace with real build path
+	projectPath := "/home/scriptgad/Documents/app1" // replace with real build path
 
 	fmt.Println("🔍 Detecting project runtime...")
 
@@ -365,10 +381,23 @@ func main() {
 	if result.CanHostLocally {
 		fmt.Println("✔ System can host the container locally.")
 		fmt.Println("Host: Local")
+
+		fmt.Println("🚀 Starting  container locally")
+		time.Sleep(5 * time.Second) // Simulate startup delay
+
+		if err := runContainerCLI(buildResult.ImageID, "8080", "8080"); err != nil {
+			fmt.Println(err)
+		} 
+
+		time.Sleep(5 * time.Second) // Simulate startup delay
+		fmt.Println("✔ Container started successfully.")
+
 	} else {
 		fmt.Println("❌ System cannot host the container locally:", result.Reason)
 		fmt.Println("Host: Seed")
 	}
+
+
 
 	
 
