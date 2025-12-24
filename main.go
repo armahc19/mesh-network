@@ -23,6 +23,10 @@ import (
 	//	"github.com/libp2p/go-libp2p/core/host"
 	//"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
+
+	cid "github.com/ipfs/go-cid"
+	mh "github.com/multiformats/go-multihash"
+	 
 )
 
 var bootstrapAddr = []string{
@@ -197,6 +201,52 @@ func main() {
 	// Also use util.Advertise for better discovery
 	go util.Advertise(ctx, routingDiscovery, DiscoveryNamespace)
 
+
+	
+    // Bootstrap DHT
+    if err = kadDHT.Bootstrap(ctx); err != nil {
+        panic(err)
+    }
+
+	// Step 4: Start background ticker for capability publishing + discovery
+    go func() {
+        ticker := time.NewTicker(10 * time.Minute)
+        defer ticker.Stop()
+        for range ticker.C {
+            res := CollectRuntimeResources()
+            keys := GetCapabilityKeys(res)
+
+            // Publish keys
+            for _, key := range keys {
+                hash, _ := mh.Sum([]byte(key), mh.SHA2_256, -1)
+                c := cid.NewCidV1(cid.Raw, hash)
+                if err := kadDHT.Provide(ctx, c, true); err != nil {
+
+                    log.Printf("DHT: failed to provide key %s: %v", key, err)
+                } else {
+                    log.Printf("DHT: provided key %s", key)
+                }
+            }
+
+            // Discover peers
+            for _, key := range keys {
+                peerInfos, err := FindPeersByCapability(ctx, kadDHT, key)
+                if err != nil {
+                    log.Printf("Failed to find peers for %s: %v", key, err)
+                    continue
+                }
+                for _, p := range peerInfos {
+                    info, err := RequestResources(ctx, h, p.ID)
+                    if err != nil {
+                        log.Printf("Failed to get resources from %s: %v", p.ID, err)
+                        continue
+                    }
+                    log.Printf("Peer %s live resources: %+v", p.ID, info)
+                }
+            }
+        }
+    }() // <- goroutine ends here
+    // --------------------------
 
 
 	 // 2. In your background loops, use log.Printf instead of fmt.Println
