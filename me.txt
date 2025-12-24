@@ -1,1 +1,1 @@
-go run publish.go runtime_detect.go dockerfileTemplate.go buildImage.go
+go run main.go publish.go runtime_detect.go dockerfileTemplate.go buildImage.go capabilities.go resource_protocol.go

@@ -29,6 +29,13 @@ type ResourceCheckResult struct {
 	CPUCores       int
 }
 
+type ResourceCheckResultDHT struct {
+	RAMFree   uint64 // bytes
+	DiskFree  uint64 // bytes
+	CPUCores  int
+	CPUArch   string
+	GPU       bool
+}
 
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
@@ -400,4 +407,26 @@ func detect_runtime(pathway string, serviceID string,port int) {
 	}
 	
 
+}
+
+// CollectRuntimeResources inspects the local machine
+func CollectRuntimeResources() *ResourceCheckResultDHT {
+	var stat syscall.Sysinfo_t
+	syscall.Sysinfo(&stat)
+
+	var fs syscall.Statfs_t
+	syscall.Statfs("/", &fs)
+
+	return &ResourceCheckResultDHT{
+		RAMFree:  stat.Freeram * uint64(stat.Unit),
+		DiskFree: fs.Bavail * uint64(fs.Bsize),
+		CPUCores: runtime.NumCPU(),
+		CPUArch:  runtime.GOARCH,
+		GPU:      hasNvidiaGPU(),
+	}
+}
+
+func hasNvidiaGPU() bool {
+	_, err := os.Stat("/dev/nvidia0")
+	return err == nil
 }

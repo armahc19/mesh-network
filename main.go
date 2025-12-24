@@ -95,6 +95,17 @@ func main() {
 		panic(err)
 	}
 
+	// ---- STEP 2: Detect & Publish Capabilities ----
+	res := CollectRuntimeResources()
+	capKeys := GetCapabilityKeys(res)
+	
+	// Log what capabilities we are publishing
+	log.Printf("Publishing capability keys: %v", capKeys)
+	
+	PublishCapabilities(ctx, kadDHT, capKeys)
+	
+
+
 	// Wait a bit for DHT to initialize
 	time.Sleep(2 * time.Second)
 
@@ -218,7 +229,8 @@ func main() {
         fmt.Println("\nMesh CLI")
         fmt.Println("1. Publish (Deploy Application)")
         fmt.Println("2. Network Status")
-        fmt.Println("3. Exit")
+		fmt.Println("3. Query Peers by Capability") // <--- new option
+        fmt.Println("4. Exit")
         fmt.Print("Enter your choice: ")
 
         scanner.Scan()
@@ -236,7 +248,28 @@ func main() {
             for _, p := range peers {
                 fmt.Printf(" Peer ID: %s\n", p)
             }
-        case 3:
+		case 3:
+			fmt.Print("Enter capability key (e.g., mesh-gpu-cuda): ")
+			scanner.Scan()
+			key := strings.TrimSpace(scanner.Text())
+		
+			ctx := context.Background()
+			peers, err := FindPeersByCapability(ctx, kadDHT, key)
+			if err != nil {
+				log.Printf("Failed to find peers for %s: %v", key, err)
+				continue
+			}
+		
+			for _, pi := range peers { // pi is peer.AddrInfo
+				// FIX: Pass pi.ID instead of the whole struct pi
+				info, err := RequestResources(ctx, h, pi.ID) 
+				if err != nil {
+					log.Printf("Failed to get resources from %s: %v", pi.ID, err)
+					continue
+				}
+				log.Printf("Peer %s live resources: %+v", pi.ID, info)
+			}
+        case 4:
             fmt.Println("Shutting down node...")
             h.Close()
             return

@@ -15,3 +15,29 @@
 2025/12/24 06:07:45 Network: Advertise failed: failed to find any peer in table
 2025/12/24 06:08:00 Network: Looking for peers...
 2025/12/24 06:08:05 Network Stats: Connected Peers: 0
+2025/12/24 14:43:00 Publishing capability keys: [mesh-node-v1 mesh-disk-100gb mesh-cpu-amd64 mesh-cpu-4core]
+2025/12/24 14:43:00 DHT: failed to provide key mesh-node-v1: failed to find any peer in table
+2025/12/24 14:43:00 DHT: failed to provide key mesh-disk-100gb: failed to find any peer in table
+2025/12/24 14:43:00 DHT: failed to provide key mesh-cpu-amd64: failed to find any peer in table
+2025/12/24 14:43:00 DHT: failed to provide key mesh-cpu-4core: failed to find any peer in table
+2025/12/24 14:43:07 Network: Looking for peers...
+2025/12/24 14:43:07 Network: Advertise failed: failed to find any peer in table
+2025/12/24 14:43:07 Network: Advertise failed: failed to find any peer in table
+2025/12/24 14:43:22 Network: Looking for peers...
+2025/12/24 14:43:27 Network Stats: Connected Peers: 0
+2025/12/24 14:43:37 Network: Advertise failed: failed to find any peer in table
+2025/12/24 14:43:37 Network: Advertise failed: failed to find any peer in table
+2025/12/24 14:43:37 Network: Looking for peers...
+2025/12/24 14:43:47 Network Stats: Connected Peers: 0
+2025/12/24 14:43:52 Network: Looking for peers...
+2025/12/24 14:44:07 Network Stats: Connected Peers: 0
+2025/12/24 14:44:07 Network: Advertise failed: failed to find any peer in table
+2025/12/24 14:44:07 Network: Advertise failed: failed to find any peer in table
+2025/12/24 14:44:07 Network: Looking for peers...
+2025/12/24 14:44:22 Network: Looking for peers...
+2025/12/24 14:44:27 Network Stats: Connected Peers: 0
+2025/12/24 14:44:37 Network: Advertise failed: failed to find any peer in table
+2025/12/24 14:44:37 Network: Advertise failed: failed to find any peer in table
+2025/12/24 14:44:37 Network: Looking for peers...
+2025/12/24 14:44:39 Failed to get resources from 12D3KooWLtm6r32qh4QUxkvQ3DmhoXRwhLEukzxREfqhPZEe8GzM: failed to dial: dial to self attempted
+2025/12/24 14:44:47 Network Stats: Connected Peers: 0
