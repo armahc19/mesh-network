@@ -218,7 +218,7 @@ func publishFlow(scanner *bufio.Scanner) {
 
 
 
-func main() {
+/*func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Buffer(make([]byte, 1024), 1024*1024)
 
@@ -246,3 +246,4 @@ func main() {
 		}
 	}
 }
+*/

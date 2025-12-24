@@ -1,10 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"log"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	libp2p "github.com/libp2p/go-libp2p"
@@ -30,6 +35,16 @@ const DiscoveryNamespace = "ai-node"
 var pskHex = "652c765126bb04a82bdadd7c5b1df9321c9ee679e0f9243a5ab27d275e097fe8"
 
 func main() {
+	 // 1. Setup the log file at the very start of main()
+	 f, err := os.OpenFile("mesh_node.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	 if err != nil {
+		 fmt.Printf("Warning: couldn't create log file: %v\n", err)
+	 } else {
+		 defer f.Close()
+		 // Tell the log package to write to the file, not the screen
+		 log.SetOutput(f)
+	 }
+	 
 	// Parse command line flags
 	port := flag.Int("port", 0, "Port to listen on (0 for random)")
 	flag.Parse()
@@ -117,63 +132,53 @@ func main() {
 	}
 
 	// Start advertising and discovery
+	// --- START ADVERTISING AND DISCOVERY (CLEAN VERSION) ---
 	routingDiscovery := routing.NewRoutingDiscovery(kadDHT)
 	
-	// Advertise this node
+	// 1. Advertise (Only one loop, logging to file)
 	go func() {
 		for {
 			ttl, err := routingDiscovery.Advertise(ctx, DiscoveryNamespace)
 			if err != nil {
-				fmt.Printf("Advertise failed: %v, retrying in 30s...\n", err)
+				log.Printf("Network: Advertise failed: %v", err)
 			} else {
-				fmt.Printf("Successfully advertised for TTL: %v\n", ttl)
+				log.Printf("Network: Successfully advertised (TTL: %v)", ttl)
 			}
 			time.Sleep(30 * time.Second)
 		}
 	}()
 
-	// Discover peers
+	// 2. Discover Peers (Logging to file)
 	go func() {
 		for {
-			fmt.Println("Looking for peers...")
+			// This used to be fmt.Println, now it's silent
+			log.Println("Network: Looking for peers...") 
 			peerChan, err := routingDiscovery.FindPeers(ctx, DiscoveryNamespace)
 			if err != nil {
-				fmt.Printf("FindPeers error: %v\n", err)
+				log.Printf("Network: FindPeers error: %v", err)
 				time.Sleep(10 * time.Second)
 				continue
 			}
 
-			connectedCount := 0
 			for pi := range peerChan {
-				// Skip self and empty addresses
 				if pi.ID == h.ID() || len(pi.Addrs) == 0 {
 					continue
 				}
-
-				// Check if already connected
 				if h.Network().Connectedness(pi.ID) == network.Connected {
 					continue
 				}
 
-				fmt.Printf("Found peer: %s\n", pi.ID)
-				
-				// Try to connect
+				// Try to connect silently
 				ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 				err := h.Connect(ctx, pi)
 				cancel()
 				
 				if err != nil {
-					fmt.Printf("Failed to connect to %s: %v\n", pi.ID, err)
+					log.Printf("Network: Failed to connect to %s: %v", pi.ID, err)
 				} else {
-					fmt.Printf("Connected to peer: %s\n", pi.ID)
-					connectedCount++
+					log.Printf("Network: Connected to peer: %s", pi.ID)
 				}
 			}
-			
-			if connectedCount > 0 {
-				fmt.Printf("Connected to %d new peers\n", connectedCount)
-			}
-			
 			time.Sleep(15 * time.Second)
 		}
 	}()
@@ -181,20 +186,62 @@ func main() {
 	// Also use util.Advertise for better discovery
 	go util.Advertise(ctx, routingDiscovery, DiscoveryNamespace)
 
-	// Print connected peers periodically
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
+
+
+	 // 2. In your background loops, use log.Printf instead of fmt.Println
+	 go func() {
+        for {
+            ttl, err := routingDiscovery.Advertise(ctx, DiscoveryNamespace)
+            if err != nil {
+                log.Printf("Network: Advertise failed: %v", err) // Goes to file
+            } else {
+                log.Printf("Network: Advertised successfully (TTL: %v)", ttl) // Goes to file
+            }
+            time.Sleep(30 * time.Second)
+        }
+    }()
+
+	 // Move the peer list monitor to a background goroutine 
+    // Now logging to file to keep the CLI menu clean
+    go func() {
+        ticker := time.NewTicker(20 * time.Second)
+        for range ticker.C {
+            peers := h.Network().Peers()
+            // CHANGED: log.Printf writes to mesh_node.log instead of the screen
+            log.Printf("Network Stats: Connected Peers: %d", len(peers))
+        }
+    }()
 	
-	for {
-		select {
-		case <-ticker.C:
-			peers := h.Network().Peers()
-			fmt.Printf("\n=== Connected Peers (%d) ===\n", len(peers))
-			for _, p := range peers {
-				conns := h.Network().ConnsToPeer(p)
-				fmt.Printf("  %s (%d connections)\n", p, len(conns))
-			}
-			fmt.Println("=========================\n")
-		}
-	}
+    // START THE INTERACTIVE UI (Mesh CLI)
+    scanner := bufio.NewScanner(os.Stdin)
+    for {
+        fmt.Println("\nMesh CLI")
+        fmt.Println("1. Publish (Deploy Application)")
+        fmt.Println("2. Network Status")
+        fmt.Println("3. Exit")
+        fmt.Print("Enter your choice: ")
+
+        scanner.Scan()
+        choiceStr := strings.TrimSpace(scanner.Text())
+        choice, _ := strconv.Atoi(choiceStr)
+
+        switch choice {
+        case 1:
+            // This function is defined in publish.go
+            // It will now run while the P2P node is active in the background
+            publishFlow(scanner) 
+        case 2:
+            peers := h.Network().Peers()
+            fmt.Printf("\n--- Connected Peers (%d) ---\n", len(peers))
+            for _, p := range peers {
+                fmt.Printf(" Peer ID: %s\n", p)
+            }
+        case 3:
+            fmt.Println("Shutting down node...")
+            h.Close()
+            return
+        default:
+            fmt.Println("Invalid choice.")
+        }
+    }
 }
