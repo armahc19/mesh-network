@@ -34,12 +34,17 @@ func RequestResources(ctx context.Context, h host.Host, pid peer.ID) (*ResourceC
 		return nil, err
 	}
 	defer s.Close()
+	// Add a log here to prove you are receiving
+    log.Printf("Requesting and waiting for data from peer: %s", pid)
 
 	reader := bufio.NewReader(s)
 	var res ResourceCheckResult
 	if err := json.NewDecoder(reader).Decode(&res); err != nil {
 		return nil, err
 	}
+	// Process data...
+    log.Printf("Successfully RECEIVED resource data from peer: %s", pid)
+
 
 	return &res, nil
 }

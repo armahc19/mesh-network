@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -26,11 +27,13 @@ import (
 
 	cid "github.com/ipfs/go-cid"
 	mh "github.com/multiformats/go-multihash"
-	 
 )
 
 var bootstrapAddr = []string{
-    "/ip4/10.221.123.1/tcp/4001/p2p/12D3KooWLVwiyp4SxfGkg1FNPdQc1veWZPhSCPNfbk4itoVWAaUj",
+    "/ip4/10.58.110.170/tcp/4001/p2p/12D3KooWGxW2qhhpWMUhQJNRfH6iHshCh5fV7d18FqfKiLBdnwER",
+  "/ip4/127.0.0.1/tcp/4001/p2p/12D3KooWGxW2qhhpWMUhQJNRfH6iHshCh5fV7d18FqfKiLBdnwER",
+
+
 }
 
 const DiscoveryNamespace = "ai-node"
@@ -82,6 +85,34 @@ func main() {
 		panic(err)
 	}
 
+	// Register the handler so other nodes can query this node's resources
+	// Add "encoding/json" to your imports at the top of the file
+
+h.SetStreamHandler("/mesh/resources/1.0.0", func(s network.Stream) {
+    defer s.Close()
+    
+    // 1. Collect the struct
+    res := CollectRuntimeResources() 
+    
+    // 2. Convert the struct to JSON bytes
+    jsonData, err := json.Marshal(res)
+    if err != nil {
+        log.Printf("Error encoding JSON: %v", err)
+        return
+    }
+    
+    // 3. Send the JSON bytes
+    _, err = s.Write(jsonData)
+    if err != nil {
+        log.Printf("Error writing to stream: %v", err)
+        return
+    }
+    
+    log.Printf("Sent local resource info to peer: %s", s.Conn().RemotePeer())
+})
+
+
+
 	fmt.Printf("Node ID: %s\n", h.ID())
 	fmt.Printf("Listening addresses:\n")
 	for _, addr := range h.Addrs() {
@@ -100,13 +131,29 @@ func main() {
 	}
 
 	// ---- STEP 2: Detect & Publish Capabilities ----
-	res := CollectRuntimeResources()
+	/*res := CollectRuntimeResources()
 	capKeys := GetCapabilityKeys(res)
 	
 	// Log what capabilities we are publishing
 	log.Printf("Publishing capability keys: %v", capKeys)
 	
-	PublishCapabilities(ctx, kadDHT, capKeys)
+	PublishCapabilities(ctx, kadDHT, capKeys)*/
+
+	go func() {
+		for {
+			peers := h.Network().Peers()
+			if len(peers) > 0 {
+				// Trigger publishing immediately once we have a peer
+				res := CollectRuntimeResources()
+				capKeys := GetCapabilityKeys(res)
+				log.Printf("Publishing capability keys: %v", capKeys)
+				PublishCapabilities(ctx, kadDHT, capKeys)
+				log.Printf("Published capability keys: %v", capKeys)
+				break // Exit this "wait for first peer" loop
+			}
+			//time.Sleep(5 * time.Second)
+		}
+	}()
 	
 
 
@@ -210,7 +257,7 @@ func main() {
 
 	// Step 4: Start background ticker for capability publishing + discovery
     go func() {
-        ticker := time.NewTicker(10 * time.Minute)
+        ticker := time.NewTicker(5 * time.Second)
         defer ticker.Stop()
         for range ticker.C {
             res := CollectRuntimeResources()
@@ -236,6 +283,13 @@ func main() {
                     continue
                 }
                 for _, p := range peerInfos {
+
+					// === ADD THIS CHECK HERE ===
+					if p.ID == h.ID() {
+						continue // Skip trying to dial yourself
+					}
+					// ===========================			
+
                     info, err := RequestResources(ctx, h, p.ID)
                     if err != nil {
                         log.Printf("Failed to get resources from %s: %v", p.ID, err)
@@ -299,26 +353,56 @@ func main() {
                 fmt.Printf(" Peer ID: %s\n", p)
             }
 		case 3:
-			fmt.Print("Enter capability key (e.g., mesh-gpu-cuda): ")
+			fmt.Print("Enter capability key (e.g., mesh-disk-100gb): ")
 			scanner.Scan()
 			key := strings.TrimSpace(scanner.Text())
 		
-			ctx := context.Background()
+			fmt.Printf("Searching for nodes with capability: [%s]...\n", key)
+			
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+		
 			peers, err := FindPeersByCapability(ctx, kadDHT, key)
 			if err != nil {
-				log.Printf("Failed to find peers for %s: %v", key, err)
+				fmt.Printf("❌ Discovery error: %v\n", err)
 				continue
 			}
 		
-			for _, pi := range peers { // pi is peer.AddrInfo
-				// FIX: Pass pi.ID instead of the whole struct pi
-				info, err := RequestResources(ctx, h, pi.ID) 
-				if err != nil {
-					log.Printf("Failed to get resources from %s: %v", pi.ID, err)
+			if len(peers) == 0 {
+				fmt.Println("⚠️ No nodes found with that capability.")
+				continue
+			}
+		
+			fmt.Printf("Found %d potential nodes. Fetching live stats...\n", len(peers))
+			fmt.Println(strings.Repeat("-", 60))
+		
+			for _, pi := range peers {
+				// Skip self so you don't dial yourself in the CLI
+				if pi.ID == h.ID() {
+					fmt.Printf("Node: %s (You)\n", pi.ID)
 					continue
 				}
-				log.Printf("Peer %s live resources: %+v", pi.ID, info)
+		
+				info, err := RequestResources(ctx, h, pi.ID)
+				if err != nil {
+					fmt.Printf("Node: %s | ❌ Error: %v\n", pi.ID, err)
+					continue
+				}
+		
+				// DISPLAY TO SCREEN
+				fmt.Printf("✅ Node ID: %s\n", pi.ID)
+				fmt.Printf("   Cores: %d | RAM Free: %d MB | Disk Free: %d GB\n", 
+					info.CPUCores, 
+					info.RAMFree / (1024 * 1024),      // Convert bytes to MB
+					info.DiskFree / (1024 * 1024 * 1024), // Convert bytes to GB
+				)
+				fmt.Printf("   Can Host: %v | Status: %s\n", info.CanHostLocally, info.Reason)
+				fmt.Println(strings.Repeat("-", 60))
+				
+				// Also keep the log for debugging
+				log.Printf("CLI Query: Peer %s resources: %+v", pi.ID, info)
 			}
+		
         case 4:
             fmt.Println("Shutting down node...")
             h.Close()
