@@ -1,20 +1,22 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
-	"time"
-	"encoding/json"
 	"regexp"
 	"runtime"
+	//"strconv"
 	"syscall"
-	"os/exec"
-	
-
-	
+	"time"
 )
+
+// Define a type for the callback function
+type OnSuccess func(imageID string, port string)
+
 
 type RuntimeInfo struct {
 	Runtime string
@@ -302,7 +304,7 @@ func runContainerCLI(image, hostPort, containerPort string) error {
 }
 
 
-func detect_runtime(pathway string, serviceID string,port int) {
+func detect_runtime(pathway string, serviceID string,port int,node *Node) {
 	projectPath := pathway // replace with real build path
 
 	fmt.Println("🔍 Detecting project runtime...")
@@ -401,6 +403,35 @@ func detect_runtime(pathway string, serviceID string,port int) {
 		time.Sleep(5 * time.Second) // Simulate startup delay
 		fmt.Println("✔ Container started successfully.")
 
+		// start the service advertisement 
+		fmt.Println("Advertising service")
+		
+
+		/*// 1. Convert the port string to integer
+		pInt, _ := strconv.Atoi(portStr)
+
+		// 2. Call the registration function (from Phase 1 code)
+		_, err := RegisterLocalService(h.ID().String(), buildResult.ImageID, pInt)
+		if err != nil {
+			fmt.Printf("❌ Identity error: %v\n", err)
+		} else {
+			fmt.Println("📢 Service identity registered. Mesh will advertise automatically.")
+
+
+		}
+		// Optional: Immediate push to DHT
+		c, _ := ServiceIDToCID(ServiceID(buildResult.ImageID))
+		go kadDHT.Provide(ctx, c, true) */
+		fmt.Println("📢 Advertising service to mesh...")
+        
+        // No need for 'go func' or 'strconv' here since 'port' is already an int
+        if err := node.OnServiceStarted(buildResult.ImageID, port); err != nil {
+            fmt.Printf("❌ Mesh update failed: %v\n", err)
+        } else {
+            fmt.Println("✅ Mesh Advertisement Successful")
+        }
+
+
 	} else {
 		fmt.Println("❌ System cannot host the container locally:", result.Reason)
 		fmt.Println("Host: Seed")
@@ -430,3 +461,4 @@ func hasNvidiaGPU() bool {
 	_, err := os.Stat("/dev/nvidia0")
 	return err == nil
 }
+

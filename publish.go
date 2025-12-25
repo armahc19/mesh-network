@@ -147,7 +147,7 @@ func checkDocker() bool {
 }
 
 
-func publishFlow(scanner *bufio.Scanner) {
+func publishFlow(scanner *bufio.Scanner,node *Node) {
 	fmt.Print("Enter repo URL or folder path: ")
 	scanner.Scan()
 	path := strings.TrimSpace(scanner.Text())
@@ -212,7 +212,7 @@ func publishFlow(scanner *bufio.Scanner) {
 
 
 	fmt.Println("- Containerization")
-	detect_runtime(buildPath, serviceID,port)
+	detect_runtime(buildPath, serviceID,port,node)
 
 }
 
