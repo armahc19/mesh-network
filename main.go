@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -57,6 +58,10 @@ func main() {
 
 	// Parse command line flags
 	port := flag.Int("port", 0, "Port to listen on (0 for random)")
+
+	 // NEW: Port for the HTTP Gateway
+	 gport := flag.Int("gport", 8080, "Port for the Public HTTP Gateway")
+
 	flag.Parse()
 
 	ctx := context.Background()
@@ -140,6 +145,18 @@ func main() {
 
 	// Setup P2P protocol handlers
 	node.SetupHandlers()
+
+	// START GATEWAY (Phase 1)
+	 // Use the flag value instead of hardcoded ":8080"
+	 gatewayAddr := fmt.Sprintf(":%d", *gport)
+	 gateway := NewMeshGateway(node, gatewayAddr, "mesh.io")
+	 
+	 go func() {
+		 fmt.Printf("🚀 Public HTTP Gateway listening on %s\n", gatewayAddr)
+		 if err := http.ListenAndServe(gateway.PublicPort, gateway); err != nil {
+			 log.Printf("⚠️ Gateway on %s failed (likely port in use): %v", gatewayAddr, err)
+		 }
+	 }()
 
 	// ---- STEP 2: Detect & Publish Capabilities ----
 	/*res := CollectRuntimeResources()

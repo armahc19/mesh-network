@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"strings"
 	"sync"
+	"net"
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -21,6 +23,9 @@ type Node struct {
 	DHT        *dht.IpfsDHT
 	advertOnce sync.Once
 }
+
+const TunnelProtocol = "/mesh/tunnel/1.0.0"
+
 
 // OnServiceStarted is called by runtime_detect.go after a container is live
 func (n *Node) OnServiceStarted(imageID string, port int) error {
@@ -132,7 +137,78 @@ func (n *Node) SetupHandlers() {
             }
         }
     })
+
+	// node.go (Inside SetupHandlers)
+
+n.Host.SetStreamHandler(TunnelProtocol, func(s network.Stream) {
+	// 1. Read the ServiceID header from the stream
+	scanner := bufio.NewScanner(s)
+	if !scanner.Scan() {
+		log.Println("❌ Tunnel: Failed to read ServiceID header")
+		s.Reset()
+		return
+	}
+	sid := ServiceID(scanner.Text())
+
+	// 2. Look up the local MeshPort for this ServiceID
+	instance, ok := MyHostedServices[sid]
+	if !ok {
+		log.Printf("❌ Tunnel: Service %s not found on this host", sid[:12])
+		s.Reset()
+		return
+	}
+
+	// 3. Dial the dynamic local port
+	targetAddr := fmt.Sprintf("127.0.0.1:%d", instance.MeshPort)
+	conn, err := net.Dial("tcp", targetAddr)
+	if err != nil {
+		log.Printf("❌ Tunnel: Failed to reach container at %s: %v", targetAddr, err)
+		s.Reset()
+		return
+	}
+
+	log.Printf("🚀 Tunnel Linked: Mesh -> Local Container %s (Port %d)", sid[:12], instance.MeshPort)
+
+	// 4. Start the pipe
+	go func() {
+		defer s.Close()
+		defer conn.Close()
+		go io.Copy(s, conn)
+		io.Copy(conn, s)
+	}()
+})
     
     // You can also move your existing /mesh/resources/1.0.0 handler here later!
     log.Println("✅ P2P Stream Handlers registered.")
+}
+
+
+// TunnelTraffic connects a local network connection to a remote P2P stream
+// node.go
+
+// UPDATE: Added 'sid ServiceID' to the parameters
+func (n *Node) TunnelTraffic(ctx context.Context, target peer.ID, sid ServiceID, localConn net.Conn) {
+    // Now it matches the 4 arguments: (ctx, target, sid, localConn)
+    stream, err := n.Host.NewStream(ctx, target, TunnelProtocol)
+    if err != nil {
+        log.Printf("❌ Tunnel fail: %v", err)
+        localConn.Close()
+        return
+    }
+
+    // Write the Service ID as a header so the remote host knows which app to dial
+    _, err = stream.Write([]byte(string(sid) + "\n"))
+    if err != nil {
+        log.Printf("❌ Failed to write tunnel header: %v", err)
+        stream.Reset()
+        return
+    }
+
+    // Start the bi-directional pipe
+    go func() {
+        defer stream.Close()
+        defer localConn.Close()
+        go io.Copy(stream, localConn)
+        io.Copy(localConn, stream)
+    }()
 }
