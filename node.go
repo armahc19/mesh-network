@@ -139,44 +139,80 @@ func (n *Node) SetupHandlers() {
     })
 
 	// node.go (Inside SetupHandlers)
-
-n.Host.SetStreamHandler(TunnelProtocol, func(s network.Stream) {
-	// 1. Read the ServiceID header from the stream
-	scanner := bufio.NewScanner(s)
-	if !scanner.Scan() {
-		log.Println("❌ Tunnel: Failed to read ServiceID header")
-		s.Reset()
-		return
-	}
-	sid := ServiceID(scanner.Text())
-
-	// 2. Look up the local MeshPort for this ServiceID
-	instance, ok := MyHostedServices[sid]
-	if !ok {
-		log.Printf("❌ Tunnel: Service %s not found on this host", sid[:12])
-		s.Reset()
-		return
-	}
-
-	// 3. Dial the dynamic local port
-	targetAddr := fmt.Sprintf("127.0.0.1:%d", instance.MeshPort)
-	conn, err := net.Dial("tcp", targetAddr)
-	if err != nil {
-		log.Printf("❌ Tunnel: Failed to reach container at %s: %v", targetAddr, err)
-		s.Reset()
-		return
-	}
-
-	log.Printf("🚀 Tunnel Linked: Mesh -> Local Container %s (Port %d)", sid[:12], instance.MeshPort)
-
-	// 4. Start the pipe
-	go func() {
-		defer s.Close()
-		defer conn.Close()
-		go io.Copy(s, conn)
-		io.Copy(conn, s)
-	}()
-})
+	n.Host.SetStreamHandler(TunnelProtocol, func(s network.Stream) {
+		log.Println("=== TUNNEL HANDLER START ===")
+		log.Printf("Received stream from peer: %s", s.Conn().RemotePeer())
+		
+		// 1. Read the ServiceID header from the stream
+		log.Println("Reading ServiceID header...")
+		scanner := bufio.NewScanner(s)
+		if !scanner.Scan() {
+			log.Println("❌ Tunnel: Failed to read ServiceID header")
+			s.Reset()
+			log.Println("=== TUNNEL HANDLER END (Failed to read) ===")
+			return
+		}
+		
+		receivedText := scanner.Text()
+		log.Printf("Received raw text: %q", receivedText)
+		sid := ServiceID(receivedText)
+		log.Printf("Parsed ServiceID: %s (first 12 chars)", sid[:12])
+		
+		// 2. Look up the local MeshPort for this ServiceID
+		log.Println("Looking up ServiceID in MyHostedServices...")
+		log.Printf("MyHostedServices has %d entries", len(MyHostedServices))
+		
+		// Log all keys in MyHostedServices for debugging
+		if len(MyHostedServices) > 0 {
+			log.Println("Keys in MyHostedServices:")
+			for k := range MyHostedServices {
+				log.Printf("  - %s (first 12 chars)", string(k)[:12])
+			}
+		}
+		
+		instance, ok := MyHostedServices[sid]
+		if !ok {
+			log.Printf("❌ Tunnel: Service %s not found on this host", sid[:12])
+			s.Reset()
+			log.Println("=== TUNNEL HANDLER END (Service not found) ===")
+			return
+		}
+		
+		log.Printf("Found service instance. MeshPort: %d", instance.MeshPort)
+		
+		// 3. Dial the dynamic local port
+		targetAddr := fmt.Sprintf("127.0.0.1:%d", instance.MeshPort)
+		log.Printf("Dialing container at: %s", targetAddr)
+		
+		conn, err := net.Dial("tcp", targetAddr)
+		if err != nil {
+			log.Printf("❌ Tunnel: Failed to reach container at %s: %v", targetAddr, err)
+			s.Reset()
+			log.Println("=== TUNNEL HANDLER END (Failed to dial) ===")
+			return
+		}
+		
+		log.Printf("Successfully connected to container at %s", targetAddr)
+		log.Printf("🚀 Tunnel Linked: Mesh -> Local Container %s (Port %d)", sid[:12], instance.MeshPort)
+	
+		// 4. Start the pipe
+		log.Println("Starting bidirectional pipe...")
+		go func() {
+			defer func() {
+				s.Close()
+				conn.Close()
+				log.Println("Pipe goroutine: Connections closed")
+				log.Println("=== TUNNEL HANDLER END (Pipe started) ===")
+			}()
+			
+			log.Println("Starting io.Copy operations...")
+			go io.Copy(s, conn)
+			log.Println("Started: io.Copy(s, conn) - container -> stream")
+			
+			io.Copy(conn, s)
+			log.Println("Started: io.Copy(conn, s) - stream -> container")
+		}()
+	})
     
     // You can also move your existing /mesh/resources/1.0.0 handler here later!
     log.Println("✅ P2P Stream Handlers registered.")
