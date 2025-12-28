@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+
 	//"strconv"
 	"syscall"
 	"time"
@@ -304,7 +306,7 @@ func runContainerCLI(image, hostPort, containerPort string) error {
 }
 
 
-func detect_runtime(pathway string, serviceID string,port int,node *Node) {
+func detect_runtime(ctx context.Context,pathway string, serviceID string,port int,node *Node) {
 	projectPath := pathway // replace with real build path
 
 	fmt.Println("🔍 Detecting project runtime...")
@@ -387,7 +389,34 @@ func detect_runtime(pathway string, serviceID string,port int,node *Node) {
 	fmt.Println("🔍 Deciding hosting method...")
 	time.Sleep(10 * time.Second) // Simulate decision delay
 
-	if result.CanHostLocally {
+
+
+//	if result.CanHostLocally {
+	
+		fmt.Println("❌ System cannot host the container locally:", result.Reason)
+		fmt.Println("🛰️ Entering Seeding Mode...")
+
+		// 1. Run the Scheduler
+		targetNode, err := SchedulerChecker(ctx, node, uint64(buildResult.ImageSize), buildResult.ImageID)
+		if err != nil {
+			fmt.Println("❌ Scheduling failed:", err)
+			return
+		}
+
+		fmt.Printf("✅ Best Node Selected: %s\n", targetNode.String())
+		fmt.Println("📦 Preparing container transfer...")
+
+		// 2. Stream the container (using 'docker save' as discussed)
+		// We pass buildResult.ImageID (the hash) to be loaded on the other side
+		err = BuildAndSeedContainer(ctx, node.Host, targetNode, buildResult.ImageID, port)
+		if err != nil {
+			fmt.Printf("❌ Transfer failed: %v\n", err)
+			return
+		}
+
+		fmt.Println("🚀 Service delegated successfully to peer.")
+//	}
+/*	if result.CanHostLocally {
 		fmt.Println("✔ System can host the container locally.")
 		fmt.Println("Host: Local")
 
@@ -407,7 +436,7 @@ func detect_runtime(pathway string, serviceID string,port int,node *Node) {
 		fmt.Println("Advertising service")
 		
 
-		/*// 1. Convert the port string to integer
+		"/// 1. Convert the port string to integer
 		pInt, _ := strconv.Atoi(portStr)
 
 		// 2. Call the registration function (from Phase 1 code)
@@ -421,7 +450,7 @@ func detect_runtime(pathway string, serviceID string,port int,node *Node) {
 		}
 		// Optional: Immediate push to DHT
 		c, _ := ServiceIDToCID(ServiceID(buildResult.ImageID))
-		go kadDHT.Provide(ctx, c, true) */
+		go kadDHT.Provide(ctx, c, true) "
 		fmt.Println("📢 Advertising service to mesh...")
         
         // No need for 'go func' or 'strconv' here since 'port' is already an int
@@ -433,9 +462,29 @@ func detect_runtime(pathway string, serviceID string,port int,node *Node) {
 
 
 	} else {
-		fmt.Println("❌ System cannot host the container locally:", result.Reason)
-		fmt.Println("Host: Seed")
-	}
+			fmt.Println("❌ System cannot host the container locally:", result.Reason)
+			fmt.Println("🛰️ Entering Seeding Mode...")
+	
+			// 1. Run the Scheduler
+			targetNode, err := SchedulerChecker(ctx, node, uint64(buildResult.ImageSize), buildResult.ImageID)
+			if err != nil {
+				fmt.Println("❌ Scheduling failed:", err)
+				return
+			}
+	
+			fmt.Printf("✅ Best Node Selected: %s\n", targetNode.String())
+			fmt.Println("📦 Preparing container transfer...")
+	
+			// 2. Stream the container (using 'docker save' as discussed)
+			// We pass buildResult.ImageID (the hash) to be loaded on the other side
+			err = BuildAndSeedContainer(ctx, node.Host, targetNode, buildResult.ImageID, port)
+			if err != nil {
+				fmt.Printf("❌ Transfer failed: %v\n", err)
+				return
+			}
+	
+			fmt.Println("🚀 Service delegated successfully to peer.")
+		} */
 	
 
 }

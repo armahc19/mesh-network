@@ -212,7 +212,7 @@ func publishFlow(scanner *bufio.Scanner,node *Node) {
 
 
 	fmt.Println("- Containerization")
-	detect_runtime(buildPath, serviceID,port,node)
+	detect_runtime(node.Ctx,buildPath, serviceID,port,node)
 
 }
 

@@ -1,1 +1,1 @@
-go run main.go publish.go runtime_detect.go dockerfileTemplate.go buildImage.go capabilities.go resource_protocol.go service_identity.go node.go
+go run main.go publish.go runtime_detect.go dockerfileTemplate.go buildImage.go capabilities.go resource_protocol.go service_identity.go node.go gateway.go scheduler.go -port 4001 -gport 8080

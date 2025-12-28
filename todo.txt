@@ -1,0 +1,48 @@
+- Load Balancing:
+so multiple Provider nodes can host the same Service ID.
+The Gateway can then load-balance between them using Round Robin or Least Connections algorithms to improve resilience.
+
+
+1. Add Load Balancing
+Currently picks first instance. Could add:
+    -Round-robin selection
+    -Health checks
+    -Least-connections algorithm
+
+- Health Checks:
+ Implement a mechanism where the Provider node regularly checks if the local Docker container is responsive.
+ If it fails, the Provider should unpublish its Service ID from the DHT.
+
+
+2.Add Service Health Monitoring
+	-Periodic health checks of advertised services
+	- Automatic removal of unhealthy instances
+	-Service status endpoints
+
+-	HTTPS/TLS: Moving from http to https for the end-user.
+	 Add TLS/HTTPS Support
+    -TLS termination at gateway
+	-Let's Encrypt integration
+	-Service-to-service encryption
+    
+-	Multi-Tenancy: Deploying multiple Docker containers and ensuring the DHT routes to the right one every time.
+
+3. Add Authentication/Authorization
+    -API keys for gateway access
+    -Service-level permissions
+	-Rate limiting
+
+- Scheduler 
+Next, you need a scheduler that decides
+Which peer should run a task
+
+Based on:
+Capability match
+Current load
+Latency
+
+Price (later)
+Think of this as:
+“Given a job, who’s the best node right now?”
+This does not belong in main.go.
+This becomes a separate internal service:

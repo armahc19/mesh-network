@@ -36,8 +36,7 @@ var (
 )
 
 var bootstrapAddr = []string{
-	"/ip4/10.58.110.170/tcp/4001/p2p/12D3KooWGxW2qhhpWMUhQJNRfH6iHshCh5fV7d18FqfKiLBdnwER",
-	"/ip4/127.0.0.1/tcp/4001/p2p/12D3KooWGxW2qhhpWMUhQJNRfH6iHshCh5fV7d18FqfKiLBdnwER",
+	"/ip4/10.150.129.127/tcp/4001/p2p/12D3KooWJFKzKN64Ygwnth9SRZKYkFXhQaMs44LW5ZuaKMaDApRQ",
 }
 
 const DiscoveryNamespace = "ai-node"
@@ -146,6 +145,8 @@ func main() {
 	// Setup P2P protocol handlers
 	node.SetupHandlers()
 
+	node.SetupContainerDeployHandler()
+
 	// START GATEWAY (Phase 1)
 	 // Use the flag value instead of hardcoded ":8080"
 	 gatewayAddr := fmt.Sprintf(":%d", *gport)
@@ -179,7 +180,7 @@ func main() {
 				log.Printf("Published capability keys: %v", capKeys)
 				break // Exit this "wait for first peer" loop
 			}
-			//time.Sleep(5 * time.Second)
+			time.Sleep(5 * time.Second)
 		}
 	}()
 
